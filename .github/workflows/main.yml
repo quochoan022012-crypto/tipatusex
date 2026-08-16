@@ -3,6 +3,8 @@ name: Build TIPA
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -18,14 +20,6 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        shell: bash
-        run: |
-          set -eux
-
-          sudo apt-get update
-          sudo apt-get install -y curl git clang make ldid
-
       - name: Install Theos
         shell: bash
         run: |
@@ -35,8 +29,8 @@ jobs:
 
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
 
-          test -d "$THEOS"
-          ls -la "$THEOS"
+          test -x "$THEOS/toolchain/linux/iphone/bin/clang"
+          echo "Theos installed successfully"
 
       - name: Check project
         shell: bash
@@ -46,10 +40,9 @@ jobs:
           echo "===== ROOT ====="
           ls -la
 
-          echo "===== PROJECT ====="
+          echo "===== TipaTipaKtien ====="
           ls -la TipaTipaKtien
 
-          echo "===== MAKEFILE ====="
           test -f TipaTipaKtien/Makefile
 
       - name: Download libAPIClient.a
@@ -81,7 +74,6 @@ jobs:
           cd TipaTipaKtien
 
           make clean || true
-
           make package FINALPACKAGE=1
 
       - name: Show build output
@@ -89,8 +81,11 @@ jobs:
         run: |
           set -eux
 
-          echo "===== PACKAGES ====="
-          find TipaTipaKtien/packages -maxdepth 1 -type f -print -exec ls -lh {} \;
+          find TipaTipaKtien/packages \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            -exec ls -lh {} \;
 
       - name: Upload TIPA
         uses: actions/upload-artifact@v4
