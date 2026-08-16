@@ -1,0 +1,100 @@
+name: Build TIPA
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    env:
+      THEOS: ${{ github.workspace }}/theos
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -eux
+
+          sudo apt-get update
+          sudo apt-get install -y curl git clang make ldid
+
+      - name: Install Theos
+        shell: bash
+        run: |
+          set -eux
+
+          export THEOS="$GITHUB_WORKSPACE/theos"
+
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+
+          test -d "$THEOS"
+          ls -la "$THEOS"
+
+      - name: Check project
+        shell: bash
+        run: |
+          set -eux
+
+          echo "===== ROOT ====="
+          ls -la
+
+          echo "===== PROJECT ====="
+          ls -la TipaTipaKtien
+
+          echo "===== MAKEFILE ====="
+          test -f TipaTipaKtien/Makefile
+
+      - name: Download libAPIClient.a
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -eux
+
+          mkdir -p TipaTipaKtien/API
+
+          gh release download v1.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "libAPIClient.a" \
+            --dir TipaTipaKtien/API \
+            --clobber
+
+          test -s TipaTipaKtien/API/libAPIClient.a
+
+          ls -lh TipaTipaKtien/API/libAPIClient.a
+
+      - name: Build TIPA
+        shell: bash
+        run: |
+          set -eux
+
+          export THEOS="$GITHUB_WORKSPACE/theos"
+
+          cd TipaTipaKtien
+
+          make clean || true
+
+          make package FINALPACKAGE=1
+
+      - name: Show build output
+        shell: bash
+        run: |
+          set -eux
+
+          echo "===== PACKAGES ====="
+          find TipaTipaKtien/packages -maxdepth 1 -type f -print -exec ls -lh {} \;
+
+      - name: Upload TIPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: QHOANIOS-TIPA
+          path: TipaTipaKtien/packages/*.tipa
+          if-no-files-found: error
