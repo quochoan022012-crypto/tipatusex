@@ -1,29 +1,77 @@
-- name: Check project
-  shell: bash
-  run: |
-    set -eux
+name: Build TIPA
 
-    echo "===== ROOT ====="
-    ls -la
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-    echo "===== PROJECT ====="
-    test -f makefile
-    echo "Makefile found"
+permissions:
+  contents: read
 
-- name: Build TIPA
-  shell: bash
-  run: |
-    set -eux
+jobs:
+  build:
+    runs-on: ubuntu-24.04
 
-    export THEOS="$GITHUB_WORKSPACE/theos"
+    env:
+      THEOS: ${{ github.workspace }}/theos
 
-    make clean || true
-    make package FINALPACKAGE=1
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-- name: Show build output
-  shell: bash
-  run: |
-    set -eux
+      - name: Install Theos
+        shell: bash
+        run: |
+          set -eux
+          export THEOS="$GITHUB_WORKSPACE/theos"
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
 
-    echo "===== BUILD OUTPUT ====="
-    find . -type f \( -name "*.tipa" -o -name "*.deb" \) -print
+      - name: Check project
+        shell: bash
+        run: |
+          set -eux
+          echo "===== ROOT ====="
+          ls -la
+          test -f makefile
+          echo "Makefile found"
+
+      - name: Download libAPIClient.a
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p API
+
+          gh release download v1.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "libAPIClient.a" \
+            --dir API \
+            --clobber
+
+          test -s API/libAPIClient.a
+          ls -lh API/libAPIClient.a
+
+      - name: Build TIPA
+        shell: bash
+        run: |
+          set -eux
+          export THEOS="$GITHUB_WORKSPACE/theos"
+
+          make clean || true
+          make package FINALPACKAGE=1
+
+      - name: Show build output
+        shell: bash
+        run: |
+          set -eux
+          echo "===== BUILD OUTPUT ====="
+          find . -type f \( -name "*.tipa" -o -name "*.deb" \) -print
+
+      - name: Upload TIPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: QHOANIOS-TIPA
+          path: packages/*.tipa
+          if-no-files-found: error
